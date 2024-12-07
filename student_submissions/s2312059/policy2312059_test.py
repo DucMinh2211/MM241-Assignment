@@ -4,102 +4,18 @@ import numpy as np
 class Policy2312059(Policy):
     def __init__(self):
         # Student code here
-        self.epsilon = 0.01
+        """
+        Khởi tạo AFPTAS với tham số epsilon.
+        """
+        self.epsilon = epsilon  # Sai số gần đúng
+        self.actions = []  # Danh sách các hành động sẽ thực hiện
         pass
 
     def get_action(self, observation, info):
         # Student code here
-
-        list_prods = observation["products"]
-        stocks = observation["stocks"]
-
-        prod_size = [0, 0]
-        stock_idx = -1
-        pos_x, pos_y = None, None
-
-        # Step 1: Classify products into wide and narrow dynamically
-        wide_prods = []
-        narrow_prods = []
-        threshold = self.epsilon / (2 + self.epsilon)
-        for prod in list_prods:
-            if prod["quantity"] > 0:
-                if prod["size"][0] > threshold:
-                    wide_prods.append(prod)
-                else:
-                    narrow_prods.append(prod)
-
-        # Step 2: Attempt to place wide products first
-        for prod in wide_prods:
-            prod_size = prod["size"]
-
-            for i, stock in enumerate(stocks):
-                stock_w, stock_h = self._get_stock_size_(stock)
-                prod_w, prod_h = prod_size
-
-                if stock_w < prod_w or stock_h < prod_h:
-                    continue
-
-                for x in range(stock_w - prod_w + 1):
-                    for y in range(stock_h - prod_h + 1):
-                        if self._can_place_(stock, (x, y), prod_size):
-                            stock_idx = i
-                            pos_x, pos_y = x, y
-                            break
-                    if pos_x is not None and pos_y is not None:
-                        break
-
-                if pos_x is not None and pos_y is not None:
-                    break
-
-            if pos_x is not None and pos_y is not None:
-                break
-
-        # Step 3: If no wide product can be placed, try narrow products
-        if pos_x is None and pos_y is None:
-            for prod in narrow_prods:
-                prod_size = prod["size"]
-
-                for i, stock in enumerate(stocks):
-                    stock_w, stock_h = self._get_stock_size_(stock)
-                    prod_w, prod_h = prod_size
-
-                    if stock_w < prod_w or stock_h < prod_h:
-                        continue
-
-                    for x in range(stock_w - prod_w + 1):
-                        for y in range(stock_h - prod_h + 1):
-                            if self._can_place_(stock, (x, y), prod_size):
-                                stock_idx = i
-                                pos_x, pos_y = x, y
-                                break
-                        if pos_x is not None and pos_y is not None:
-                            break
-
-                    if pos_x is not None and pos_y is not None:
-                        break
-
-                if pos_x is not None and pos_y is not None:
-                    break
-
-        # Return the action
-        return {"stock_idx": stock_idx, "size": prod_size, "position": (pos_x, pos_y)}
-        pass
-
-    # Student code here
-    # You can add more functions if needed
-
-class Policy2312055(Policy):
-    def __init__(self, epsilon=0.1):
-        """
-        Khởi tạo chính sách AFPTAS với tham số epsilon.
-        """
-        self.epsilon = epsilon  # Sai số gần đúng
-        self.actions = []  # Danh sách các hành động sẽ thực hiện
-
-    def get_action(self, observation, info):
         """
         Trả về hành động tiếp theo dựa trên danh sách hành động đã sinh ra.
-        Nếu danh sách hành động trống, tạo mới bằng thuật toán AFPTAS.
+        Nếu danh sách hành động trống, tạo danh sách mới bằng thuật toán AFPTAS.
         """
         if not self.actions:
             self.actions = self.generate_all_actions(observation, info)
@@ -110,19 +26,23 @@ class Policy2312055(Policy):
             return self.actions.pop(0)
         else:
             return {"stock_idx": -1, "size": (0, 0), "position": (0, 0)}
+        pass
+
+    # Student code here
+    # You can add more functions if needed
 
     def generate_all_actions(self, observation, info):
         """
-        Sinh ra toàn bộ danh sách hành động bằng thuật toán AFPTAS.
+        Sinh ra toàn bộ actions bằng thuật toán AFPTAS.
         """
         products = observation["products"]
         stocks = observation["stocks"]
 
         # Phân loại sản phẩm
-        wide_prods, narrow_prods = self.classify_items(products, stocks)
+        avg_stock_width = sum(self._get_stock_size_(s)[0] for s in stocks) / len(stocks)
+        wide_prods, narrow_prods = self.classify_items(products, stocks, avg_stock_width)
 
         # Gom nhóm sản phẩm nhỏ
-        avg_stock_width = sum(self._get_stock_size_(s)[0] for s in stocks) / len(stocks)
         grouped_narrow_prods = self.group_small_items(narrow_prods, avg_stock_width)
 
         # Tạo danh sách hành động
@@ -137,11 +57,10 @@ class Policy2312055(Policy):
 
         return actions
 
-    def classify_items(self, products, stocks):
+    def classify_items(self, products, stocks, avg_stock_width):
         """
         Phân loại sản phẩm thành wide và narrow dựa trên ngưỡng epsilon.
         """
-        avg_stock_width = sum(self._get_stock_size_(s)[0] for s in stocks) / len(stocks)
         threshold = self.epsilon / (2 + self.epsilon) * avg_stock_width
 
         wide_prods = [p for p in products if p["size"][0] > threshold]
@@ -151,7 +70,7 @@ class Policy2312055(Policy):
 
     def group_small_items(self, narrow_prods, max_width):
         """
-        Gom nhóm sản phẩm nhỏ thành các khối lớn hơn để đóng gói hiệu quả.
+        Gom nhóm sản phẩm nhỏ thành các khối lớn hơn để strip-packing hiệu quả.
         """
         grouped_items = []
         current_width, max_height = 0, 0
@@ -171,12 +90,13 @@ class Policy2312055(Policy):
 
     def first_fit_decreasing(self, items, stocks):
         """
-        Đóng gói sản phẩm lớn theo chiến lược First Fit Decreasing.
+        Đóng gói sản phẩm 'wide' theo chiến lược First Fit Decreasing.
         """
         actions = []
+        # Sắp xếp sản phẩm theo diện tích giảm dần
         items = sorted(items, key=lambda x: x["size"][0] * x["size"][1], reverse=True)
         pos_x, pos_y = 0, 0
-
+        # Lần lượt đặt từng sản phẩm
         for item in items:
             if item["quantity"] <= 0: continue
             for stock_idx, stock in enumerate(stocks):
