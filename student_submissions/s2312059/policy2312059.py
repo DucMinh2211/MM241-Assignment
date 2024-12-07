@@ -217,6 +217,10 @@ class Policy2312055(Policy):
         for item in small_items:
             item_w, item_h = item["size"]
 
+            if stock_w < item_w or stock_h < item_h:
+                continue
+
+            pos_x, pos_y = None, None
             for x in range(stock_w - item_w + 1):
                 for y in range(stock_h - item_h + 1):
                     if self._can_place_(stock, (x, y), item["size"]):
