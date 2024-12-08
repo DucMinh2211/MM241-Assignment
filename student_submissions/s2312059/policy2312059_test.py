@@ -7,7 +7,7 @@ class Policy2312059(Policy):
         """
         Khởi tạo AFPTAS với tham số epsilon.
         """
-        self.epsilon = epsilon  # Sai số gần đúng
+        self.epsilon = 0.1  # Sai số gần đúng
         self.actions = []  # Danh sách các hành động sẽ thực hiện
         pass
 
@@ -66,6 +66,8 @@ class Policy2312059(Policy):
         wide_prods = [p for p in products if p["size"][0] > threshold]
         narrow_prods = [p for p in products if p["size"][0] <= threshold]
 
+        print(str(len(wide_prods)) + " " + str(len(narrow_prods)))
+
         return wide_prods, narrow_prods
 
     def group_small_items(self, narrow_prods, max_width):
@@ -76,6 +78,7 @@ class Policy2312059(Policy):
         current_width, max_height = 0, 0
 
         for prod in narrow_prods:
+            if prod["quantity"] <= 0: continue
             prod_w, prod_h = prod["size"]
             if current_width + prod_w > max_width:
                 grouped_items.append({"size": (current_width, max_height)})
@@ -121,6 +124,7 @@ class Policy2312059(Policy):
                         "size": item["size"],
                         "position": (pos_x, pos_y),
                     })
+                    print("fit")
                     break
    
             if pos_x is not None and pos_y is not None:
@@ -133,17 +137,38 @@ class Policy2312059(Policy):
         """
         actions = []
         stock_w, stock_h = self._get_stock_size_(stock)
+        pos_x, pos_y = 0, 0
 
         for item in small_items:
             item_w, item_h = item["size"]
 
+            if stock_w < item_w or stock_h < item_h:
+                continue
+
+            pos_x, pos_y = None, None
             for x in range(stock_w - item_w + 1):
                 for y in range(stock_h - item_h + 1):
                     if self._can_place_(stock, (x, y), item["size"]):
-                        actions.append({
-                            "stock_idx": stock_idx,
-                            "size": item["size"],
-                            "position": (x, y),
-                        })
+                        pos_x, pos_y = x, y
                         break
+                        # actions.append({
+                        #     "stock_idx": stock_idx,
+                        #     "size": item["size"],
+                        #     "position": (x, y),
+                        # })
+                        # break
+                    if pos_x is not None and pos_y is not None:
+                        break
+
+                if pos_x is not None and pos_y is not None:
+                    actions.append({
+                        "stock_idx": stock_idx,
+                        "size": item["size"],
+                        "position": (pos_x, pos_y),
+                    })
+                    print("fill")
+                    break
+   
+            if pos_x is not None and pos_y is not None:
+                break
         return actions
