@@ -31,10 +31,7 @@ class Policy2312059(Policy):
                 sum(p["size"][0] * p["size"][1] * p["quantity"] for p in products) / 
                 sum(self._get_stock_size_(s)[0] * self._get_stock_size_(s)[1] for s in stocks)
             )
-            # print(self.epsilon)
-
-        if len(products) < 2:
-            return self.best_fit_packing(products, stocks)
+            print(self.epsilon)
 
         # Phân loại sản phẩm
         wide_prods, narrow_prods = self.classify_items(products, self.avg_stock_width)
@@ -43,6 +40,7 @@ class Policy2312059(Policy):
             action = self.first_fit_decreasing(wide_prods, stocks)
             # print("w")
         else:  # Nếu hết wide_prods -> sang narrow_prods
+            # print("n")
             if not self.current_stock:
                 self.current_stock = 0
             for stock_idx, stock in enumerate(stocks[self.current_stock:], start=self.current_stock):
@@ -56,7 +54,6 @@ class Policy2312059(Policy):
 
         if not action:
             return {"stock_idx": 0, "size": (0, 0), "position": (0, 0)}
-        # print(action)
         return action
 
 
@@ -82,7 +79,7 @@ class Policy2312059(Policy):
                 continue
             prod_w, prod_h = prod["size"]
             for stock_idx, stock in enumerate(stocks):
-                position = self.find_position_min_waste(stock, (prod_w, prod_h))
+                position = self.find_position(stock, (prod_w, prod_h))
                 if position:
                     action = {
                         "type" : "wide",
@@ -113,45 +110,6 @@ class Policy2312059(Policy):
                 }
                 return action
         return None
-    
-    def greedy(self, narrow_prods, stocks):
-        list_prods = narrow_prods
-
-        prod_size = [0, 0]
-        stock_idx = -1
-        prod_idx = -1
-        pos_x, pos_y = 0, 0
-
-        # Pick a product that has quality > 0
-        for i, prod in enumerate(list_prods):
-            if prod["quantity"] > 0:
-                prod_size = prod["size"]
-
-                # Loop through all stocks
-                for idx, stock in enumerate(stocks):
-                    stock_w, stock_h = self._get_stock_size_(stock)
-                    prod_w, prod_h = prod_size
-
-                    if stock_w < prod_w or stock_h < prod_h:
-                        continue
-
-                    pos_x, pos_y = None, None
-                    for x in range(stock_w - prod_w + 1):
-                        for y in range(stock_h - prod_h + 1):
-                            if self._can_place_(stock, (x, y), prod_size):
-                                pos_x, pos_y = x, y
-                                break
-                        if pos_x is not None and pos_y is not None:
-                            break
-
-                    if pos_x is not None and pos_y is not None:
-                        stock_idx = idx
-                        prod_idx = i
-                        break
-
-                if pos_x is not None and pos_y is not None:
-                    break
-        return {"stock_idx": stock_idx, "prod_idx" : prod_idx,"size": prod_size, "position": (pos_x, pos_y)}
 
     def find_position(self, stock, prod_size):
         """
@@ -189,6 +147,28 @@ class Policy2312059(Policy):
             best_position = None
             best_score = float("inf")  # Score thấp nhất là tốt nhất
             
+            if len(self.actions) > 0 and self.actions[-1] is not None:
+                stock_idx = self.actions[-1]["stock_idx"]
+                stock = stocks[stock_idx]
+                stock_w, stock_h = self._get_stock_size_(stock)
+            
+                # Bỏ qua kho nếu kích thước không phù hợp
+                if prod_w > stock_w or prod_h > stock_h:
+                    continue
+
+                # Tìm vị trí phù hợp đầu tiên trong kho
+                position = self.find_position_min_waste(stock, prod["size"])
+                if position:
+                    # Tính điểm dựa trên tiêu chí:
+                    waste = (stock_w - prod_w) * (stock_h - prod_h)
+                    
+                    score = waste
+
+                    if score < best_score:
+                        best_score = score
+                        best_stock_idx = stock_idx
+                        best_position = position
+
             for stock_idx, stock in enumerate(stocks):
                 stock_w, stock_h = self._get_stock_size_(stock)
 
@@ -200,9 +180,7 @@ class Policy2312059(Policy):
                 position = self.find_position_min_waste(stock, prod["size"])
                 if position:
                     # Tính điểm dựa trên tiêu chí:
-                    total_area = stock_w * stock_h
-                    used_area = np.sum(stock >= 0) + prod_w * prod_h
-                    waste = total_area - used_area
+                    waste = (stock_w - prod_w) * (stock_h - prod_h)
                     
                     score = waste
 
@@ -239,9 +217,7 @@ class Policy2312059(Policy):
             for y in range(stock_h - prod_h + 1):
                 if self._can_place_(stock, (x, y), prod_size):
                     # Tính lãng phí không gian
-                    total_area = stock_w * stock_h
-                    used_area = np.sum(stock >= 0) + prod_w * prod_h
-                    waste = total_area - used_area
+                    waste = ((stock_w - (x + prod_w)) * stock_h) + (x * stock_h) + ((stock_h - (y + prod_h)) * stock_w)
                     if waste < min_waste:
                         min_waste = waste
                         best_position = (x, y)
@@ -253,10 +229,10 @@ class Policy2312059(Policy):
         prods = observation["products"]
         used_area = 0
         total_area = 0
-        used_stocks = np.sum(np.any(stock >= 0) for stock in stocks)
+        used_stocks = np.sum(np.any(stock > 0) for stock in stocks)
 
         for stock in stocks: 
             stock_w, stock_h = self._get_stock_size_(stock)
-            if (np.any(stock >= 0)): total_area += stock_w * stock_h
-            used_area += np.sum(stock >= 0)  # Số lượng ô đã sử dụng
+            if (np.any(stock > 0)): total_area += stock_w * stock_h
+            used_area += np.sum(stock > 0)  # Số lượng ô đã sử dụng
         return (used_area, total_area, used_stocks) 
