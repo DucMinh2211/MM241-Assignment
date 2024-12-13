@@ -12,6 +12,7 @@ class Policy2312059(Policy):
         self.max_stock_width = None
         self.min_stock_width = None
         self.current_stock = None
+        self.threshold = None
         self.actions = []
 
 
@@ -65,6 +66,7 @@ class Policy2312059(Policy):
         Phân loại sản phẩm thành wide và narrow dựa trên ngưỡng epsilon.
         """
         threshold = self.epsilon / (2 + self.epsilon) * avg_stock_width
+        self.threshold = threshold
         wide_prods = [p for p in products if p["size"][0] > threshold]
         narrow_prods = [p for p in products if p["size"][0] <= threshold]
         # print({"len_nr_prods" : len(narrow_prods), "len_wi_prods" : len(wide_prods)})
@@ -250,7 +252,6 @@ class Policy2312059(Policy):
 
     def filled_ratio(self, observation):
         stocks = observation["stocks"]
-        prods = observation["products"]
         used_area = 0
         total_area = 0
         used_stocks = np.sum(np.any(stock >= 0) for stock in stocks)
